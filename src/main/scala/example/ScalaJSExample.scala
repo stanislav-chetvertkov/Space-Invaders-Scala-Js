@@ -14,7 +14,9 @@ case class Point(x: Int, y: Int){
 object ScalaJSExample {
 
   case class Enemy(var x:Int, y:Int)
-  case class Player(var x:Int)
+  case class EnemyBullet(x: Int, var y:Int)
+
+  case class Player(var x:Int, var alive:Boolean)
   case class Bullet(x:Int, var y:Int)
   case class Explosion(x:Int, y:Int, var phase:Int = 20)
 
@@ -28,12 +30,18 @@ object ScalaJSExample {
         stepsLeft = 40
       } else {
         if (direction == "left") enemies.foreach( e => e.x -= 1) else enemies.foreach( e => e.x += 1)
-
         stepsLeft -= 1
       }
     }
 
-    def fire = {
+    def attack = {
+      val int = scala.util.Random.nextInt(20)
+      if (int==5){
+
+        val enemyIndex: Int = scala.util.Random.nextInt(enemies.size)
+        val enemy: Enemy = enemies(enemyIndex)
+        enemyBullets = enemyBullets :+ Bullet(enemy.x, enemy.y)
+      }
 
     }
 
@@ -46,10 +54,11 @@ object ScalaJSExample {
                               Enemy(50, 250), Enemy(100, 250), Enemy(150, 250), Enemy(200, 250), Enemy(250, 250), Enemy(300, 250)
     )
   )
-  val player = Player(0)
+  val player = Player(0, true)
   var bullets:ArrayBuffer[Bullet] = ArrayBuffer()
   var enemyBullets:ArrayBuffer[Bullet] = ArrayBuffer()
   var explosions:ArrayBuffer[Explosion] = ArrayBuffer[Explosion]()
+  var score = 0
 
   @JSExport
   def main(canvas: html.Canvas): Unit = {
@@ -57,7 +66,9 @@ object ScalaJSExample {
                     .asInstanceOf[dom.CanvasRenderingContext2D]
 
     def fire = {
-      bullets :+= Bullet(player.x, 0)
+      if (bullets.size < 3){
+        bullets :+= Bullet(player.x+5, canvas.height-20)
+      }
     }
 
     canvas.width = canvas.parentElement.clientWidth
@@ -88,6 +99,7 @@ object ScalaJSExample {
       clear()
       drawPlayer()
       drawBullets()
+      drawText()
       drawInvaders()
       drawExplosions()
     }
@@ -96,6 +108,7 @@ object ScalaJSExample {
       updateBullets()
       detectCollisions()
       enemyCluster.move
+      enemyCluster.attack
       updateExplosions()
     }
 
@@ -116,8 +129,19 @@ object ScalaJSExample {
           bullets = bullets - bullet
           enemyCluster.enemies -= enemy
           explosions = explosions :+ Explosion(enemy.x, enemy.y)
+          score += 1
         }
       }
+
+      for (bullet:Bullet <- enemyBullets) {
+        val dist = distance(bullet.x, bullet.y, player.x, canvas.height-20)
+        if (dist < 25){
+          bullets = bullets - bullet
+          player.alive = false
+          explosions = explosions :+ Explosion(player.x, canvas.height-20)
+        }
+      }
+
     }
 
     def drawBullets() = {
@@ -125,10 +149,31 @@ object ScalaJSExample {
       bullets.foreach( b =>{
         renderer.fillRect(b.x, b.y, 5, 10)
       })
+
+      renderer.fillStyle = "blue"
+      enemyBullets.foreach( b  => {
+        renderer.fillRect(b.x, b.y, 5, 10)
+      })
+    }
+
+    def drawText() = {
+      renderer.fillStyle = "white"
+      renderer.strokeStyle = "#F00"
+      renderer.font = "italic 30pt Arial"
+      renderer.fillText(score.toString, 500, 50)
+
+      if (!player.alive){
+        renderer.font = "bold 30px sans-serif"
+        renderer.strokeText("Game over", 500, 20)
+      }
     }
 
     def updateBullets() = {
-      bullets.map(b => b.y += 5)
+      bullets.map(b => b.y -= 15)
+      bullets = bullets.filter(b => b.y > 0)
+
+      enemyBullets.map(b => b.y += 15)
+      enemyBullets = enemyBullets.filter(b => b.y < canvas.height)
     }
 
     def updateExplosions() = {
@@ -137,10 +182,12 @@ object ScalaJSExample {
     }
 
     def drawPlayer() = {
-      renderer.fillStyle = "green"
-      val rect = canvas.getBoundingClientRect()
-      renderer.fillRect(player.x - rect.left,rect.top,20, 20)
-    }
+      if (player.alive){
+        renderer.fillStyle = "green"
+        val rect = canvas.getBoundingClientRect()
+        renderer.fillRect(player.x - rect.left, canvas.height - 20, 20, 20)
+      }
+     }
 
     def drawInvaders() = {
       enemyCluster.enemies.foreach( e => {
