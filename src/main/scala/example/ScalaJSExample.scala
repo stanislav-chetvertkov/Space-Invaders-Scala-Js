@@ -20,7 +20,7 @@ object ScalaJSExample {
     }
 
     canvas.onmousedown = {
-      (e:dom.MouseEvent) => game.fire
+      (e:dom.MouseEvent) => game.player.fire
     }
 
     def run = {

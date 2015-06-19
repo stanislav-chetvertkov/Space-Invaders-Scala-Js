@@ -15,20 +15,35 @@ class Game(implicit canvas: html.Canvas) {
 
   renderer.fillRect(0, 0, canvas.width, canvas.height)
 
+
   trait Drawable {
     def draw(implicit renderer: dom.CanvasRenderingContext2D)
   }
 
   case class Enemy(var x: Int, y: Int) extends Drawable {
+    val flying = false
+    var speed = 0
+    var acceleration = 0
     override def draw(implicit renderer: CanvasRenderingContext2D): Unit = {
       renderer.fillStyle = "red"
       renderer.fillRect(x, y, 20, 20)
     }
   }
 
+//  class AttackingEnemy extends Enemy{
+//
+//  }
+
   case class EnemyBullet(x: Int, var y: Int)
 
   case class Player(var x: Int, var alive: Boolean) extends Drawable {
+
+    def fire = {
+      if (bullets.size < 3) {
+        bullets :+= Bullet(player.x + 5, canvas.height - 20, "yellow")
+      }
+    }
+
     override def draw(implicit renderer: CanvasRenderingContext2D): Unit = {
       if (alive) {
         renderer.fillStyle = "green"
@@ -49,19 +64,14 @@ class Game(implicit canvas: html.Canvas) {
     override def draw(implicit renderer: CanvasRenderingContext2D): Unit = {
       renderer.beginPath()
       renderer.arc(x, y, phase, 0, 2 * Math.PI, anticlockwise = false)
-      renderer.fillStyle = "green"
+      renderer.fillStyle = "red"
       renderer.fill()
       renderer.lineWidth = 5
-      renderer.strokeStyle = "#003300"
+      renderer.strokeStyle = "yellow"
       renderer.stroke()
     }
   }
 
-  def fire = {
-    if (bullets.size < 3) {
-      bullets :+= Bullet(player.x + 5, canvas.height - 20, "yellow")
-    }
-  }
 
   case class EnemyCluster(enemies: ArrayBuffer[Enemy]) {
     var direction = "left"
@@ -77,31 +87,39 @@ class Game(implicit canvas: html.Canvas) {
       }
     }
 
+    def selectRandomInvader(): Enemy = {
+      val enemyIndex: Int = scala.util.Random.nextInt(enemies.size)
+      enemies(enemyIndex)
+    }
+
+    def fly(enemy: Enemy) = {
+      // TODO
+    }
+
     def attack = {
       val int = scala.util.Random.nextInt(20)
       if (int == 5) {
-
-        val enemyIndex: Int = scala.util.Random.nextInt(enemies.size)
-        val enemy: Enemy = enemies(enemyIndex)
+        val enemy: Enemy = selectRandomInvader()
         enemyBullets = enemyBullets :+ Bullet(enemy.x, enemy.y, "blue")
       }
-
     }
 
   }
 
-  //  var enemies:ArrayBuffer[Enemy] =
-  var enemyCluster = new EnemyCluster(ArrayBuffer(
-    Enemy(50, 50), Enemy(100, 50), Enemy(150, 50), Enemy(200, 50), Enemy(250, 50), Enemy(300, 50),
-    Enemy(50, 150), Enemy(100, 150), Enemy(150, 150), Enemy(200, 150), Enemy(250, 150), Enemy(300, 150),
-    Enemy(50, 250), Enemy(100, 250), Enemy(150, 250), Enemy(200, 250), Enemy(250, 250), Enemy(300, 250)
+  var enemyCluster = new EnemyCluster(
+    ArrayBuffer(
+      Enemy(50, 50), Enemy(100, 50), Enemy(150, 50), Enemy(200, 50), Enemy(250, 50), Enemy(300, 50),
+      Enemy(50, 150), Enemy(100, 150), Enemy(150, 150), Enemy(200, 150), Enemy(250, 150), Enemy(300, 150),
+      Enemy(50, 250), Enemy(100, 250), Enemy(150, 250), Enemy(200, 250), Enemy(250, 250), Enemy(300, 250)
+    )
   )
-  )
-  val player = Player(0, true)
+
+  val player = Player(0, alive = true)
   var bullets: ArrayBuffer[Bullet] = ArrayBuffer()
   var enemyBullets: ArrayBuffer[Bullet] = ArrayBuffer()
   var explosions: ArrayBuffer[Explosion] = ArrayBuffer[Explosion]()
   var score = 0
+  var time = 0
 
 
   def detectCollisions() = {
@@ -135,18 +153,6 @@ class Game(implicit canvas: html.Canvas) {
 
   }
 
-  def drawText() = {
-    renderer.fillStyle = "white"
-    renderer.strokeStyle = "#F00"
-    renderer.font = "italic 30pt Arial"
-    renderer.fillText(score.toString, 500, 50)
-
-    if (!player.alive) {
-      renderer.font = "bold 30px sans-serif"
-      renderer.strokeText("Game over", 500, 20)
-    }
-  }
-
   def updateBullets() = {
     bullets.map(b => b.y -= 15)
     bullets = bullets.filter(b => b.y > 0)
@@ -156,8 +162,28 @@ class Game(implicit canvas: html.Canvas) {
   }
 
   def updateExplosions() = {
-    explosions.foreach(e => e.phase += 1)
-    explosions = explosions.filterNot(e => e.phase > 50)
+    explosions.foreach(e => e.phase += 4)
+    explosions = explosions.filterNot(e => e.phase > 40)
+  }
+
+  def drawText() = {
+    renderer.fillStyle = "white"
+    renderer.strokeStyle = "#F00"
+    renderer.font = "italic 30pt Arial"
+    renderer.fillText(score.toString, 500, 50)
+
+    renderer.fillText(s"current time is:$time", 600, 50)
+
+    if (!player.alive) {
+      renderer.font = "bold 30px sans-serif"
+      renderer.strokeText("Game over", 500, 20)
+    }
+
+    if (enemyCluster.enemies.isEmpty) {
+      renderer.font = "bold 30px sans-serif"
+      renderer.strokeText("Congratulations you win", canvas.width / 2, canvas.height / 2)
+    }
+
   }
 
   def draw() = {
@@ -171,6 +197,7 @@ class Game(implicit canvas: html.Canvas) {
   }
 
   def update() = {
+    time += 1
     updateBullets()
     detectCollisions()
     enemyCluster.move
